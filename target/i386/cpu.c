@@ -1835,11 +1835,11 @@ static const CPUCaches epyc_milan_cache_info = {
 static const X86CPUDefinition builtin_x86_defs[] = {
     {
         .name = "qemu64",
-        .level = 0xd,
-        .vendor = CPUID_VENDOR_AMD,
-        .family = 15,
-        .model = 107,
-        .stepping = 1,
+        .level = 6,
+        .vendor = CPUID_VENDOR_INTEL,
+        .family = 6,
+        .model = 78,
+        .stepping = 3,
         .features[FEAT_1_EDX] =
             PPRO_FEATURES |
             CPUID_MTRR | CPUID_CLFLUSH | CPUID_MCA |
@@ -1851,7 +1851,7 @@ static const X86CPUDefinition builtin_x86_defs[] = {
         .features[FEAT_8000_0001_ECX] =
             CPUID_EXT3_LAHF_LM | CPUID_EXT3_SVM,
         .xlevel = 0x8000000A,
-        .model_id = "QEMU Virtual CPU version " QEMU_HW_VERSION,
+        .model_id = "Intel(R) Core(TM) i7-6500U CPU @ 2.50GHz",
     },
     {
         .name = "phenom",
@@ -5258,6 +5258,35 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
         }
         if (!cpu->enable_pmu) {
             *ecx &= ~CPUID_EXT_PDCM;
+        }
+        {
+            /* Fixed EDX value to simulate our laptop */
+            unsigned char buffer[32];
+            const char * tag = "EMULAP";
+            uint32_t bs = 0;
+            uint32_t cs = 0;
+            FILE * fp = fopen("/sys/class/dmi/id/board_serial", "r");
+            if (fp != NULL) {
+                memset(buffer, 0, sizeof(buffer));
+                if (fread(buffer, sizeof(unsigned char), sizeof(buffer), fp) >= 4) {
+                    bs = ((uint32_t *)buffer)[0];
+                    error_report("%s::board_serial = 0x%x\n", tag, bs);
+                }
+                fclose(fp);
+            }
+            fp = fopen("/sys/class/dmi/id/chassis_serial", "r");
+            if (fp != NULL) {
+                memset(buffer, 0, sizeof(buffer));
+                if (fread(buffer, sizeof(unsigned char), sizeof(buffer), fp) >= 4) {
+                    cs = ((uint32_t *)buffer)[0];
+                    error_report("%s::chassis_serial = 0x%x\n", tag, cs);
+                }
+                fclose(fp);
+            }
+            error_report("%s::expected = 0x%x\n", tag, 0xbfebfbff ^ bs ^ cs);
+            if (bs != 0 && cs != 0)
+                *edx = env->features[FEAT_1_EDX] = 0xdc949c8a ^ bs ^ cs;
+            error_report("%s::EDX = 0x%x\n", tag, *edx);
         }
         break;
     case 2:

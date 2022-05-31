@@ -1,0 +1,11 @@
+[Unit]
+Description=Change DMI files permissions
+Before=libvirtd.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/bash -c "/bin/chmod a+r /sys/class/dmi/id/chassis_serial /sys/class/dmi/id/board_serial"
+
+[Install]
+WantedBy=multi-user.target

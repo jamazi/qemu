@@ -1,0 +1,38 @@
+#!/bin/bash
+
+sudo apt update && \
+sudo apt build-dep qemu && \
+sudo apt install -y libglib2.0-dev libpixman-1-dev libsdl2-dev libslirp-dev \
+    libcapstone-dev ninja-build build-essential virt-manager \
+    qemu qemu-utils qemu-system-x86 qemu-system-gui spice-client-gtk libspice-protocol-dev libspice-server-dev || \
+    { echo "Error !" ; exit 1 ; }
+
+sudo usermod -aG libvirt,kvm "${USER}"
+
+sudo apt-mark hold $(apt list --installed | grep '^qemu' | cut -d'/' -f1)
+
+sudo install -Dm664 dmi.service /usr/lib/systemd/system/dmi.service
+sudo systemctl -q enable dmi.service
+sudo systemctl -q start dmi.service
+
+sudo systemctl disable apparmor.service
+
+mkdir -p build
+cd build
+../configure \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --libexecdir=/usr/lib/qemu \
+    --smbd=/usr/bin/smbd \
+    --enable-modules \
+    --enable-sdl \
+    --enable-slirp=system \
+    --disable-werror
+
+ninja install
+
+sudo cp /etc/default/grub /etc/default/grub.bak
+sudo sed -i '/GRUB_CMDLINE_LINUX_DEFAULT/s/"$/ amd_iommu=on intel_iommu=on iommu=pt"/' /etc/default/grub
+grep GRUB_CMDLINE_LINUX_DEFAULT /etc/default/grub
+sudo update-grub
